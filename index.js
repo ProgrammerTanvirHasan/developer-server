@@ -64,13 +64,30 @@ async function run() {
       res.send(result);
     });
 
-        // /////////////////developers close///////////////////////////////////////////////////////
-
+    // /////////////////developers close///////////////////////////////////////////////////////
 
     app.post("/comment", async (req, res) => {
       const card = req.body;
-      const result = await commentBd.insertOne(card);
-      res.send(result);
+      try {
+        const existingCard = await commentBd.findOne({
+          _id: card._id,
+          email: card.email,
+        });
+
+        if (existingCard) {
+          return res
+
+            .status(400)
+
+            .json({ message: "comment item with this _id already exists" });
+        }
+
+        const result = await commentBd.insertOne(card);
+        res.send(result);
+      } catch (error) {
+        console.error("Error inserting comment:", error);
+        res.status(500).json({ message: "Error inserting comment" });
+      }
     });
 
     app.get("/comment", async (req, res) => {
@@ -78,10 +95,17 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
-    
+
+    app.get("/comment/:_id", async (req, res) => {
+      const { _id } = req.params;
+      const query = { _id: _id };
+      const cursor = commentBd.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     //////////////////////////// comment close///////////////////////////////////////////////
-   
+
     app.post("/wishlist", async (req, res) => {
       const card = req.body;
       try {
@@ -104,8 +128,6 @@ async function run() {
       }
     });
 
-  
-
     app.get("/wishlist", async (req, res) => {
       const cursor = wishlistBd.find();
       const result = await cursor.toArray();
@@ -119,7 +141,6 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
-
 
     // ////////////////////////wishlist close///////////////////////////////////////////
 
@@ -157,9 +178,7 @@ async function run() {
       }
     });
 
-
-  // ///////////////////////top post get///////////////////////////////////////
-
+    // ///////////////////////top post get///////////////////////////////////////
 
     app.delete("/wishlist/:_id", async (req, res) => {
       const { _id } = req.params;

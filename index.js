@@ -144,42 +144,6 @@ async function run() {
 
     // ////////////////////////wishlist close///////////////////////////////////////////
 
-    app.get("/top-posts", async (req, res) => {
-      try {
-        const topPosts = await developersBd
-          .aggregate([
-            {
-              $addFields: {
-                wordCount: { $size: { $split: ["$description", " "] } },
-              },
-            },
-            { $sort: { wordCount: -1 } },
-            { $limit: 10 },
-            {
-              $project: {
-                _id: 1,
-                title: 1,
-                image: 1,
-                bio: 1,
-                description: 1,
-                category: 1,
-                email: 1,
-                time: 1,
-                name: 1,
-                photoURL: 1,
-              },
-            },
-          ])
-          .toArray();
-        res.send(topPosts);
-      } catch (error) {
-        console.error("Error fetching top posts:", error);
-        res.status(500).json({ message: "Error fetching top posts" });
-      }
-    });
-
-    // ///////////////////////top post get///////////////////////////////////////
-
     app.delete("/wishlist/:_id", async (req, res) => {
       const { _id } = req.params;
 

@@ -1,11 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+var jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+//middleware
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wfkgk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -17,6 +26,21 @@ const client = new MongoClient(uri, {
   },
 });
 
+//MIDDLEWARE FOR VERIFY
+const verifyToken = (req, res, next) => {
+  const token = req?.cookies?.token;
+  if (!token) {
+    return res.status(401).send({ message: "UnAuthorized Access" });
+  }
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "UnAuthorized Access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     // await client.connect();
@@ -24,6 +48,35 @@ async function run() {
     const developersBd = client.db("developersHouse").collection("developers");
     const wishlistBd = client.db("developersHouse").collection("wishlist");
     const commentBd = client.db("developersHouse").collection("comment");
+
+    //API RELATED
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
+    });
+
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logot", user);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
+
+    //SERVICES RELATED API
+    app.post("/developers", async (req, res) => {
+      const card = req.body;
+      const result = await developersBd.insertOne(card);
+      res.send(result);
+    });
 
     app.get("/developers", async (req, res) => {
       const cursor = developersBd.find();
@@ -35,12 +88,6 @@ async function run() {
       const { _id } = req.params;
       const query = { _id: _id };
       const result = await developersBd.findOne(query);
-      res.send(result);
-    });
-
-    app.post("/developers", async (req, res) => {
-      const card = req.body;
-      const result = await developersBd.insertOne(card);
       res.send(result);
     });
 
@@ -121,6 +168,7 @@ async function run() {
         }
 
         const result = await wishlistBd.insertOne(card);
+
         res.send(result);
       } catch (error) {
         console.error("Error inserting wishlist:", error);
@@ -134,7 +182,11 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/wishlist/:email", async (req, res) => {
+    app.get("/wishlist/:email", verifyToken, async (req, res) => {
+      if (req.user.email !== req.params.email) {
+        return res.status(403).send({ message: "forbidden Access" });
+      }
+
       const { email } = req.params;
       const query = { email: email };
       const cursor = wishlistBd.find(query);

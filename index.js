@@ -68,7 +68,7 @@ async function run() {
 
     app.post("/logout", async (req, res) => {
       const user = req.body;
-      console.log("logot", user);
+      console.log(user);
       res.clearCookie("token", { maxAge: 0 }).send({ success: true });
     });
 
@@ -117,18 +117,17 @@ async function run() {
 
     app.post("/comment", async (req, res) => {
       const card = req.body;
+      
       try {
         const existingCard = await commentBd.findOne({
-          _id: card._id,
           email: card.email,
+          title: card.title,
         });
 
         if (existingCard) {
-          return res
-
-            .status(400)
-
-            .json({ message: "comment item with this _id already exists" });
+          return res.status(400).json({
+            message: "A comment with this email and title already exists",
+          });
         }
 
         const result = await commentBd.insertOne(card);
@@ -145,10 +144,10 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/comment/:_id", async (req, res) => {
-      const { _id } = req.params;
-      const query = { _id: _id };
-      const cursor = commentBd.find(query);
+    app.get("/comment/:blogId", async (req, res) => {
+      const blogId = req.params.blogId;
+
+      const cursor = commentBd.find({ blogId });
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -212,8 +211,6 @@ async function run() {
       const result = await wishlistBd.deleteOne(query);
       res.send(result);
     });
-
-    
 
     await client.db("admin").command({ ping: 1 });
     console.log(

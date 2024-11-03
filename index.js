@@ -16,7 +16,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wfkgk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 const client = new MongoClient(uri, {
   serverApi: {
@@ -48,6 +48,7 @@ async function run() {
     const developersBd = client.db("developersHouse").collection("developers");
     const wishlistBd = client.db("developersHouse").collection("wishlist");
     const commentBd = client.db("developersHouse").collection("comment");
+    const subscribeBd = client.db("developersHouse").collection("subscribe");
 
     //API RELATED
     app.post("/jwt", async (req, res) => {
@@ -86,14 +87,15 @@ async function run() {
 
     app.get("/developers/:_id", async (req, res) => {
       const { _id } = req.params;
-      const query = { _id: _id };
+
+      const query = { _id: new ObjectId(_id) };
       const result = await developersBd.findOne(query);
       res.send(result);
     });
 
     app.patch("/developers/:_id", async (req, res) => {
       const { _id } = req.params;
-      const filter = { _id: _id };
+      const filter = { _id: new ObjectId(_id) };
       const card = req.body;
       const options = { upsert: true };
       const updateDoc = {
@@ -196,6 +198,13 @@ async function run() {
 
     // ////////////////////////wishlist close///////////////////////////////////////////
 
+    app.post("/subscribe", async (req, res) => {
+      const card = req.body;
+      const result = await subscribeBd.insertOne(card);
+      res.send(result);
+    });
+    // ///////////////////////delete from wishlist//////////////////////////////////
+
     app.delete("/wishlist/:_id", async (req, res) => {
       const { _id } = req.params;
 
@@ -204,7 +213,7 @@ async function run() {
       res.send(result);
     });
 
-    // ///////////////////////delete from wishlist//////////////////////////////////
+    
 
     await client.db("admin").command({ ping: 1 });
     console.log(

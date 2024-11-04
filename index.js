@@ -43,7 +43,7 @@ const verifyToken = (req, res, next) => {
 
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
 
     const developersBd = client.db("developersHouse").collection("developers");
     const wishlistBd = client.db("developersHouse").collection("wishlist");
@@ -117,7 +117,7 @@ async function run() {
 
     app.post("/comment", async (req, res) => {
       const card = req.body;
-      
+
       try {
         const existingCard = await commentBd.findOne({
           email: card.email,
@@ -156,9 +156,10 @@ async function run() {
 
     app.post("/wishlist", async (req, res) => {
       const card = req.body;
+
       try {
         const existingCard = await wishlistBd.findOne({
-          _id: card._id,
+          blogId: card.blogId,
           email: card.email,
         });
 

@@ -9,7 +9,11 @@ const port = process.env.PORT || 5000;
 //middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://looking-for-talented-devoloper.web.app",
+      "https://looking-for-talented-devoloper.firebaseapp.com",
+    ],
     credentials: true,
   })
 );
@@ -41,9 +45,15 @@ const verifyToken = (req, res, next) => {
   });
 };
 
+const cookieOption = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production" ? true : false,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
 
     const developersBd = client.db("developersHouse").collection("developers");
     const wishlistBd = client.db("developersHouse").collection("wishlist");
@@ -57,19 +67,15 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "1h",
       });
-      res
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "none",
-        })
-        .send({ success: true });
+      res.cookie("token", token, cookieOption).send({ success: true });
     });
 
     app.post("/logout", async (req, res) => {
       const user = req.body;
       console.log(user);
-      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+      res
+        .clearCookie("token", { ...cookieOption, maxAge: 0 })
+        .send({ success: true });
     });
 
     //SERVICES RELATED API
@@ -88,9 +94,20 @@ async function run() {
     app.get("/developers/:_id", async (req, res) => {
       const { _id } = req.params;
 
-      const query = { _id: new ObjectId(_id) };
-      const result = await developersBd.findOne(query);
-      res.send(result);
+      try {
+        const query = { _id: new ObjectId(_id) };
+
+        const result = await developersBd.findOne(query);
+
+        if (result) {
+          res.send(result);
+        } else {
+          res.status(404).send({ message: "Developer not found" });
+        }
+      } catch (error) {
+        console.error("Error fetching developer:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
     });
 
     app.patch("/developers/:_id", async (req, res) => {
@@ -138,12 +155,6 @@ async function run() {
       }
     });
 
-    app.get("/comment", async (req, res) => {
-      const cursor = commentBd.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
     app.get("/comment/:blogId", async (req, res) => {
       const blogId = req.params.blogId;
 
@@ -159,7 +170,7 @@ async function run() {
 
       try {
         const existingCard = await wishlistBd.findOne({
-          blogId: card.blogId,
+          title: card.title,
           email: card.email,
         });
 
@@ -178,22 +189,19 @@ async function run() {
       }
     });
 
-    app.get("/wishlist", async (req, res) => {
-      const cursor = wishlistBd.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
     app.get("/wishlist/:email", verifyToken, async (req, res) => {
-      if (req.user.email !== req.params.email) {
-        return res.status(403).send({ message: "forbidden Access" });
-      }
-
       const { email } = req.params;
-      const query = { email: email };
-      const cursor = wishlistBd.find(query);
-      const result = await cursor.toArray();
-      res.send(result);
+
+      try {
+        const cursor = wishlistBd.find({ email: email });
+
+        const result = await cursor.toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching wishlist:", error);
+        res.status(500).send({ error: "Failed to fetch wishlist" });
+      }
     });
 
     // ////////////////////////wishlist close///////////////////////////////////////////
@@ -213,7 +221,7 @@ async function run() {
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
